@@ -1,0 +1,83 @@
+{
+  "name": "@native-federation/angular",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "packages/core/src",
+  "tags": ["npm:public"],
+  "targets": {
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "packages/core",
+        "command": "vitest"
+      },
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        {
+          "externalDependencies": ["vitest"]
+        },
+        {
+          "env": "CI"
+        }
+      ],
+      "outputs": ["{workspaceRoot}/coverage/packages/core"],
+      "dependsOn": ["^build"]
+    },
+    "nx-release-publish": {
+      "executor": "@nx/js:release-publish",
+      "dependsOn": ["^nx-release-publish"],
+      "options": {}
+    },
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "outputPath": "dist/packages/core",
+        "main": "packages/core/src/index.ts",
+        "tsConfig": "packages/core/tsconfig.lib.json",
+        "assets": [
+          "packages/core/*.md",
+          "packages/core/LICENSE",
+          {
+            "input": "./packages/core/src",
+            "glob": "**/!(*.ts)",
+            "output": "./src"
+          },
+          {
+            "input": "./packages/core/src",
+            "glob": "**/*.d.ts",
+            "output": "./src"
+          },
+          {
+            "input": "./packages/core",
+            "glob": "generators.json",
+            "output": "."
+          },
+          {
+            "input": "./packages/core",
+            "glob": "builders.json",
+            "output": "."
+          },
+          {
+            "input": "./packages/core",
+            "glob": "migration-collection.json",
+            "output": "."
+          },
+          {
+            "input": "./packages/core",
+            "glob": "executors.json",
+            "output": "."
+          },
+          {
+            "input": "./packages/core",
+            "glob": "collection.json",
+            "output": "."
+          }
+        ]
+      }
+    }
+  }
+}

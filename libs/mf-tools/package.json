@@ -1,9 +1,0 @@
-{
-  "name": "@angular-architects/module-federation-tools",
-  "version": "20.0.0",
-  "license": "MIT",
-  "peerDependencies": {},
-  "dependencies": {
-    "tslib": "^2.0.0"
-  }
-}

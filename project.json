@@ -1,5 +1,5 @@
 {
-  "name": "angular-architects",
+  "name": "@native-federation-core/source",
   "$schema": "node_modules/nx/schemas/project-schema.json",
   "targets": {
     "local-registry": {
@@ -9,9 +9,6 @@
         "config": ".verdaccio/config.yml",
         "storage": "tmp/local-registry/storage"
       }
-    },
-    "test": {
-      "command": "echo Noop"
     }
   }
 }

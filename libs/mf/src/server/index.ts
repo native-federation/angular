@@ -1,1 +1,0 @@
-import './mf-dev-server';
