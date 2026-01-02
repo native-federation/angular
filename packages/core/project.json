@@ -35,9 +35,10 @@
       "outputs": ["{options.outputPath}"],
       "defaultConfiguration": "production",
       "options": {
-        "outputPath": "dist/packages/core",
+        "outputPath": "packages/core/dist/",
         "main": "packages/core/src/index.ts",
-        "tsConfig": "packages/core/tsconfig.lib.json",
+        "tsConfig": "packages/core/tsconfig.build.json",
+        "format": ["esm"],
         "assets": [
           "packages/core/*.md",
           "packages/core/LICENSE",
@@ -64,11 +65,6 @@
           {
             "input": "./packages/core",
             "glob": "migration-collection.json",
-            "output": "."
-          },
-          {
-            "input": "./packages/core",
-            "glob": "executors.json",
             "output": "."
           },
           {

@@ -13,6 +13,7 @@ import {
 } from '@angular-devkit/architect';
 
 import { normalizeOptions } from '@angular-devkit/build-angular/src/builders/dev-server/options.js';
+import type { Schema as DevServerSchema } from '@angular-devkit/build-angular/src/builders/dev-server/schema.js';
 
 import {
   buildForFederation,
@@ -35,21 +36,20 @@ import { existsSync, mkdirSync, rmSync } from 'fs';
 import { fstart } from '../../tools/fstart-as-data-url.js';
 import { EsBuildResult, MemResults, NgCliAssetResult } from '../../utils/mem-resuts.js';
 import { type FederationInfo } from '@softarc/native-federation-runtime';
-import { type PluginBuild } from 'esbuild';
+import { type Plugin, type PluginBuild } from 'esbuild';
 import { getI18nConfig, translateFederationArtefacts } from '../../utils/i18n.js';
 import { RebuildHubs } from '../../utils/rebuild-events.js';
 import { createSharedMappingsPlugin } from '../../utils/shared-mappings-plugin.js';
 import { updateScriptTags } from '../../utils/updateIndexHtml.js';
 import { federationBuildNotifier } from './federation-build-notifier.js';
 import { type NfBuilderSchema } from './schema.js';
-import type { Schema as DevServerSchema } from '@angular-devkit/build-angular/src/builders/dev-server/schema.js';
 
 const originalWrite = process.stderr.write.bind(process.stderr);
 
 process.stderr.write = function (
   chunk: string | Uint8Array,
-  encodingOrCallback?: BufferEncoding | ((err?: Error) => void),
-  callback?: (err?: Error) => void
+  encodingOrCallback?: BufferEncoding | ((err?: Error|null) => void),
+  callback?: (err?: Error|null) => void
 ): boolean {
   const str = typeof chunk === 'string' ? chunk : chunk.toString();
 
@@ -57,21 +57,25 @@ process.stderr.write = function (
     return true;
   }
 
-  if (typeof encodingOrCallback === 'function') {
+  if (typeof encodingOrCallback !== 'string') {
     return originalWrite(chunk, encodingOrCallback);
   }
 
   return originalWrite(chunk, encodingOrCallback as BufferEncoding, callback);
 };
 
-function _buildApplication(options, context, pluginsOrExtensions) {
-  let extensions;
+function _buildApplication(
+  options: Parameters<typeof buildApplicationInternal>[0],
+  context: BuilderContext,
+  pluginsOrExtensions?: Plugin[] | Parameters<typeof buildApplicationInternal>[2]
+) {
+  let extensions: Parameters<typeof buildApplicationInternal>[2];
   if (pluginsOrExtensions && Array.isArray(pluginsOrExtensions)) {
     extensions = {
       codePlugins: pluginsOrExtensions,
     };
   } else {
-    extensions = pluginsOrExtensions;
+    extensions = pluginsOrExtensions as Parameters<typeof buildApplicationInternal>[2];
   }
   return buildApplicationInternal(options, context, extensions);
 }
@@ -118,10 +122,10 @@ export async function* runBuilder(
 
   let options = (await context.validateOptions(
     runServer
-      ? {
+      ? ({
           ...targetOptions,
           port: nfOptions.port || targetOptions['port'],
-        }
+        } as JsonObject)
       : targetOptions,
     builder
   )) as JsonObject & ApplicationBuilderOptions;
@@ -134,7 +138,7 @@ export async function* runBuilder(
   if (options['buildTarget']) {
     serverOptions = await normalizeOptions(
       context,
-      context.target.project,
+      context.target!.project,
       options as unknown as DevServerSchema
     );
 
@@ -165,7 +169,7 @@ export async function* runBuilder(
   setLogLevel(options.verbose ? 'verbose' : 'info');
 
   if (!options.outputPath) {
-    options.outputPath = `dist/${context.target.project}`;
+    options.outputPath = `dist/${context.target!.project}`;
   }
 
   const outputPath = options.outputPath;
@@ -195,7 +199,7 @@ export async function* runBuilder(
   const differentDevServerOutputPath = Array.isArray(localeFilter) && localeFilter.length === 1;
   const devServerOutputPath = !differentDevServerOutputPath
     ? browserOutputPath
-    : path.join(outputOptions.base, outputOptions.browser, options.localize[0]);
+    : path.join(outputOptions.base, outputOptions.browser, localeFilter[0]!);
 
   const entryPoint = path.join(path.dirname(options.tsConfig), 'src/main.ts');
 
@@ -252,7 +256,7 @@ export async function* runBuilder(
         ]
       : []),
 
-    (req, res, next) => {
+    (req: { url?: string }, res: { writeHead: (status: number, headers: Record<string, string>) => void; end: (body: string) => void }, next: () => void) => {
       const url = removeBaseHref(req, options.baseHref);
 
       const fileName = path.join(fedOptions.workspaceRoot, devServerOutputPath, url);
@@ -297,7 +301,7 @@ export async function* runBuilder(
   if (!write) {
     // todo: Hardcoded disabled?
     setMemResultHandler((outFiles, outDir) => {
-      const fullOutDir = outDir ? path.join(fedOptions.workspaceRoot, outDir) : null;
+      const fullOutDir = outDir ? path.join(fedOptions.workspaceRoot, outDir) : undefined;
       memResults.add(outFiles.map(f => new EsBuildResult(f, fullOutDir)));
     });
   }
@@ -308,7 +312,7 @@ export async function* runBuilder(
     federationResult = await buildForFederation(config, fedOptions, externals);
     logger.measure(start, 'To build the artifacts.');
   } catch (e) {
-    logger.error(e?.message ?? 'Building the artifacts failed');
+    logger.error((e as Error)?.message ?? 'Building the artifacts failed');
     process.exit(1);
   }
 
@@ -330,18 +334,18 @@ export async function* runBuilder(
 
   const builderRun = runServer
     ? serveWithVite(
-        serverOptions,
+        serverOptions as unknown as Parameters<typeof serveWithVite>[0],
         appBuilderName,
         _buildApplication,
         context,
         nfOptions.skipHtmlTransform ? {} : { indexHtml: transformIndexHtml(nfOptions) },
         {
-          buildPlugins: plugins as any,
+          buildPlugins: plugins,
           middleware,
         }
       )
     : buildApplication(options, context, {
-        codePlugins: plugins as any,
+        codePlugins: plugins,
         indexHtmlTransformer: transformIndexHtml(nfOptions),
       });
 
@@ -352,11 +356,11 @@ export async function* runBuilder(
       lastResult = output;
 
       if (!write && output['outputFiles']) {
-        memResults.add(output['outputFiles'].map(file => new EsBuildResult(file)));
+        memResults.add(output['outputFiles'].map((file: ConstructorParameters<typeof EsBuildResult>[0]) => new EsBuildResult(file)));
       }
 
       if (!write && output['assetFiles']) {
-        memResults.add(output['assetFiles'].map(file => new NgCliAssetResult(file)));
+        memResults.add(output['assetFiles'].map((file: ConstructorParameters<typeof NgCliAssetResult>[0]) => new NgCliAssetResult(file)));
       }
 
       // if (write && !runServer && !nfOptions.skipHtmlTransform) {
@@ -448,8 +452,8 @@ export async function* runBuilder(
   yield lastResult || { success: false };
 }
 
-function removeBaseHref(req: any, baseHref?: string) {
-  let url = req.url;
+function removeBaseHref(req: { url?: string }, baseHref?: string) {
+  let url = req.url ?? '';
 
   if (baseHref && url.startsWith(baseHref)) {
     url = url.substr(baseHref.length);
@@ -487,29 +491,7 @@ function inferConfigPath(tsConfig: string): string {
 
 function transformIndexHtml(nfOptions: NfBuilderSchema): (content: string) => Promise<string> {
   return (content: string): Promise<string> =>
-    Promise.resolve(updateScriptTags(content, 'main.js', 'polyfills.js', nfOptions));
-}
-
-function addDebugInformation(fileName: string, rawBody: string): string {
-  if (fileName !== '/remoteEntry.json') {
-    return rawBody;
-  }
-
-  const remoteEntry = JSON.parse(rawBody) as FederationInfo;
-  const shared = remoteEntry.shared;
-
-  if (!shared) {
-    return rawBody;
-  }
-
-  const sharedForVite = shared.map(s => ({
-    ...s,
-    packageName: `/@id/${s.packageName}`,
-  }));
-
-  remoteEntry.shared = [...shared, ...sharedForVite];
-
-  return JSON.stringify(remoteEntry, null, 2);
+    Promise.resolve(updateScriptTags(content, nfOptions));
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

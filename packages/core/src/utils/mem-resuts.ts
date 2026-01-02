@@ -35,7 +35,7 @@ export class NgCliAssetResult implements BuildResult {
 
   private file: NgCliAssetFile;
 
-  constructor(private assetFile: NgCliAssetFile) {
+  constructor(assetFile: NgCliAssetFile) {
     this.file = assetFile;
   }
 

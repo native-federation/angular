@@ -5,10 +5,10 @@ import {
   getWorkspaceLayout,
   names,
   offsetFromRoot,
-  Tree,
+  type Tree,
 } from '@nx/devkit';
 import * as path from 'path';
-import { NativeFederationGeneratorSchema } from './schema';
+import type { NativeFederationGeneratorSchema } from './schema.js';
 
 interface NormalizedSchema extends NativeFederationGeneratorSchema {
   projectName: string;
@@ -17,19 +17,14 @@ interface NormalizedSchema extends NativeFederationGeneratorSchema {
   parsedTags: string[];
 }
 
-function normalizeOptions(
-  tree: Tree,
-  options: NativeFederationGeneratorSchema,
-): NormalizedSchema {
+function normalizeOptions(tree: Tree, options: NativeFederationGeneratorSchema): NormalizedSchema {
   const name = names(options.name).fileName;
   const projectDirectory = options.directory
     ? `${names(options.directory).fileName}/${name}`
     : name;
   const projectName = projectDirectory.replace(new RegExp('/', 'g'), '-');
   const projectRoot = `${getWorkspaceLayout(tree).libsDir}/${projectDirectory}`;
-  const parsedTags = options.tags
-    ? options.tags.split(',').map((s) => s.trim())
-    : [];
+  const parsedTags = options.tags ? options.tags.split(',').map(s => s.trim()) : [];
 
   return {
     ...options,
@@ -47,18 +42,10 @@ function addFiles(tree: Tree, options: NormalizedSchema) {
     offsetFromRoot: offsetFromRoot(options.projectRoot),
     template: '',
   };
-  generateFiles(
-    tree,
-    path.join(__dirname, 'files'),
-    options.projectRoot,
-    templateOptions,
-  );
+  generateFiles(tree, path.join(__dirname, 'files'), options.projectRoot, templateOptions);
 }
 
-export default async function (
-  tree: Tree,
-  options: NativeFederationGeneratorSchema,
-) {
+export default async function (tree: Tree, options: NativeFederationGeneratorSchema) {
   const normalizedOptions = normalizeOptions(tree, options);
   addProjectConfiguration(tree, normalizedOptions.projectName, {
     root: normalizedOptions.projectRoot,
